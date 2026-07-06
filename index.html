@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yeditepe Üniversitesi | Bilgisayar Mühendisliği Kütüphanesi</title>
+  <meta name="description" content="Yeditepe Üniversitesi Bilgisayar Mühendisliği Bölümü öğrencileri ve yöneticileri için yeni nesil kütüphane takip ve ödünç platformu.">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- Ambient background glow orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-area">
+        <img src="logo.png" alt="Yeditepe Üniversitesi Logosu" class="logo-img">
+        <div>
+          <h1 class="logo-title">Yeditepe Üniversitesi</h1>
+          <div class="logo-subtitle">Bilgisayar Mühendisliği Kütüphanesi</div>
+        </div>
+      </div>
+
+      <!-- View Switcher & Theme Toggle -->
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <!-- Icon-Only Theme Toggle Button -->
+        <button id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" title="Gece / Gündüz Modunu Değiştir" aria-label="Tema Değiştir">
+          <span id="theme-icon">☀️</span>
+        </button>
+
+        <nav class="view-switcher" aria-label="Ekran Değiştirici">
+          <button id="btn-student-view" class="switch-btn active" onclick="switchView('student')">
+            <span>🎓</span> Öğrenci Vitrini
+          </button>
+          <button id="btn-admin-view" class="switch-btn" onclick="requestAdminAccess()">
+            <span>🔐</span> Admin Paneli
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="stats-grid" aria-label="Kütüphane İstatistikleri">
+      <div class="stat-card">
+        <div class="stat-icon blue">📖</div>
+        <div class="stat-info">
+          <h4>Toplam Kitap</h4>
+          <div id="stat-total-books" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✨</div>
+        <div class="stat-info">
+          <h4>Kütüphanede (Rafta)</h4>
+          <div id="stat-available-books" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">🔄</div>
+        <div class="stat-info">
+          <h4>Ödünç Verilenler</h4>
+          <div id="stat-borrowed-books" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">⚠️</div>
+        <div class="stat-info">
+          <h4>Süresi Gecikenler</h4>
+          <div id="stat-overdue-books" class="stat-value">0</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Global Controls & Search Bar -->
+    <section class="controls-bar" aria-label="Arama ve Filtreleme">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="Kitap adı, yazar veya kitap ID (Örn: CSE-101) ile arayın..." oninput="handleSearch()">
+      </div>
+
+      <div class="filter-group" id="category-filters">
+        <button class="filter-btn active" onclick="filterByCategory('Tümü', this)">Tümü</button>
+        <button class="filter-btn" onclick="filterByCategory('Yazılım & Algoritma', this)">Yazılım & Algoritma</button>
+        <button class="filter-btn" onclick="filterByCategory('Yapay Zeka', this)">Yapay Zeka</button>
+        <button class="filter-btn" onclick="filterByCategory('Donanım & Sistem', this)">Donanım & Sistem</button>
+        <button class="filter-btn" onclick="filterByCategory('Genel', this)">Genel</button>
+      </div>
+    </section>
+
+    <!-- STUDENT VIEW SECTION -->
+    <main id="student-view" class="view-section active">
+      <div id="student-books-grid" class="books-grid">
+        <!-- Dynamic Book Cards injected via JS -->
+      </div>
+    </main>
+
+    <!-- ADMIN VIEW SECTION -->
+    <main id="admin-view" class="view-section">
+      <!-- Admin Toolbar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="openAddBookModal()">
+            <span>➕</span> Yeni Kitap Ekle
+          </button>
+          <button class="btn btn-secondary" style="border-color: var(--accent-primary);" onclick="openChangePasswordModal()">
+            <span>🔑</span> Şifre Değiştir
+          </button>
+          <button class="btn btn-secondary" onclick="exportData()">
+            <span>💾</span> Yedek İndir (JSON)
+          </button>
+          <button class="btn btn-secondary" onclick="document.getElementById('import-file-input').click()">
+            <span>📂</span> Yedek Yükle
+          </button>
+          <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="importData(event)">
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button id="admin-tab-books" class="btn btn-secondary" style="border-color: var(--accent-primary); background: rgba(59,130,246,0.15);" onclick="switchAdminTab('books')">📚 Kitap Envanteri</button>
+          <button id="admin-tab-loans" class="btn btn-secondary" onclick="switchAdminTab('loans')">📋 Aktif Ödünç Takibi</button>
+        </div>
+      </div>
+
+      <!-- Admin Tab 1: Book Inventory Table -->
+      <div id="admin-books-section" class="admin-table-container">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Kitap Adı</th>
+              <th>Yazar</th>
+              <th>Kategori</th>
+              <th>Durum</th>
+              <th style="text-align: right;">İşlemler</th>
+            </tr>
+          </thead>
+          <tbody id="admin-books-tbody">
+            <!-- Dynamic rows injected via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Admin Tab 2: Loans Management Table -->
+      <div id="admin-loans-section" class="admin-table-container" style="display: none;">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Kitap ID</th>
+              <th>Kitap Adı</th>
+              <th>Öğrenci Adı</th>
+              <th>Öğrenci No</th>
+              <th>E-posta</th>
+              <th>Veriliş Tarihi</th>
+              <th>Son Teslim Tarihi</th>
+              <th style="text-align: right;">İade İşlemi</th>
+            </tr>
+          </thead>
+          <tbody id="admin-loans-tbody">
+            <!-- Dynamic rows injected via JS -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODALS -->
+  <!-- 0. Password Modal for Admin Panel -->
+  <div id="password-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="margin: 0 auto;">🔐 Yönetici Girişi</h3>
+        <button class="btn-close" onclick="closeModal('password-modal')">&times;</button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+        Admin paneline erişmek için lütfen yönetici şifresini giriniz.
+      </p>
+      <form id="password-form" onsubmit="verifyAdminPassword(event)">
+        <div class="form-group" style="text-align: left;">
+          <input type="password" id="admin-password-input" class="form-input" placeholder="Şifrenizi giriniz..." required style="text-align: center; letter-spacing: 2px; font-size: 1.1rem;">
+        </div>
+        <div style="display: flex; justify-content: center; gap: 12px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('password-modal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Giriş Yap</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 0.5 Change Password Modal -->
+  <div id="change-password-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Yönetici Şifresini Değiştir</h3>
+        <button class="btn-close" onclick="closeModal('change-password-modal')">&times;</button>
+      </div>
+      <form id="change-password-form" onsubmit="handleChangePassword(event)">
+        <div class="form-group">
+          <label class="form-label" for="old-pwd-input">Mevcut Şifreniz</label>
+          <input type="password" id="old-pwd-input" class="form-input" placeholder="Mevcut şifreyi giriniz" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-pwd-input">Yeni Şifreniz</label>
+          <input type="password" id="new-pwd-input" class="form-input" placeholder="Yeni şifre belirleyiniz" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirm-pwd-input">Yeni Şifre (Tekrar)</label>
+          <input type="password" id="confirm-pwd-input" class="form-input" placeholder="Yeni şifreyi tekrar giriniz" required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('change-password-modal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Şifreyi Güncelle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 1. Add / Edit Book Modal -->
+  <div id="book-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="book-modal-title" class="modal-title">Yeni Kitap Ekle</h3>
+        <button class="btn-close" onclick="closeModal('book-modal')">&times;</button>
+      </div>
+      <form id="book-form" onsubmit="handleSaveBook(event)">
+        <input type="hidden" id="edit-book-id">
+        <div class="form-group">
+          <label class="form-label" for="book-id-input">Kitap ID / Kodu</label>
+          <input type="text" id="book-id-input" class="form-input" placeholder="Örn: CSE-105" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="book-title-input">Kitap Adı</label>
+          <input type="text" id="book-title-input" class="form-input" placeholder="Örn: Introduction to Algorithms" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="book-author-input">Yazar</label>
+          <input type="text" id="book-author-input" class="form-input" placeholder="Örn: Thomas H. Cormen" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="book-category-input">Kategori</label>
+          <select id="book-category-input" class="form-select">
+            <option value="Yazılım & Algoritma">Yazılım & Algoritma</option>
+            <option value="Yapay Zeka">Yapay Zeka</option>
+            <option value="Donanım & Sistem">Donanım & Sistem</option>
+            <option value="Genel">Genel</option>
+          </select>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('book-modal')">İptal</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Lend Book Modal -->
+  <div id="lend-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Kitap Ödünç Ver</h3>
+        <button class="btn-close" onclick="closeModal('lend-modal')">&times;</button>
+      </div>
+      <form id="lend-form" onsubmit="handleLendBook(event)">
+        <input type="hidden" id="lend-book-id">
+        <div class="form-group" style="background: rgba(59,130,246,0.1); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 20px;">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Ödünç Verilecek Kitap:</div>
+          <div id="lend-book-display" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-primary);"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="student-name-input">Öğrenci Adı Soyadı</label>
+          <input type="text" id="student-name-input" class="form-input" placeholder="Örn: Emre Can" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="student-no-input">Öğrenci Numarası</label>
+          <input type="text" id="student-no-input" class="form-input" placeholder="Örn: 202307012" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="student-email-input">Öğrenci E-posta Adresi</label>
+          <input type="email" id="student-email-input" class="form-input" placeholder="Örn: emre.can@std.yeditepe.edu.tr" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="borrow-days-input">Ödünç Süresi (Gün)</label>
+          <input type="number" id="borrow-days-input" class="form-input" value="14" min="1" max="60" required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('lend-modal')">İptal</button>
+          <button type="submit" class="btn btn-success">Ödünç Ver</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
