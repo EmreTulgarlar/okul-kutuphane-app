@@ -4,6 +4,16 @@ Yeditepe Üniversitesi Bilgisayar Mühendisliği bölümü öğrencileri ve küt
 
 ![Yeditepe Üniversitesi Logosu](logo.png)
 
+## 📂 Sürümler (Eski ve Yeni Versiyonlar)
+
+Proje iki farklı mimari sürüm olarak GitHub üzerinde saklanmaktadır. Dilediğiniz sürümü aşağıdaki linklere tıklayarak inceleyebilir veya indirebilirsiniz:
+
+* 🚀 **[V2.0 - Yeni Sürüm (SQL Veritabanı & Python API - Mevcut Dal)](https://github.com/EmreTulgarlar/okul-kutuphane-app/tree/main)**: Gerçek SQLite ilişkisel veritabanı (`kutuphane.db`) ve Python sunucusuyla çalışan tam donanımlı sürüm.
+* 📌 **[V1.0 - Eski Sürüm (Sadece HTML/JS & LocalStorage)](https://github.com/EmreTulgarlar/okul-kutuphane-app/tree/v1-localstorage)**: Hiçbir sunucu veya veritabanı kurulumu olmadan, doğrudan `index.html` dosyasına çift tıklayıp tarayıcıda çalıştırdığımız ilk sürüm.
+  * *(Eski sürümü zip olarak indirmek için [V1.0 Tag Sayfasına](https://github.com/EmreTulgarlar/okul-kutuphane-app/releases/tag/v1.0-localstorage) gidebilirsiniz).*
+
+---
+
 ## ✨ Öne Çıkan Özellikler
 
 * 🗄️ **Gerçek SQL Veritabanı (SQLite & Python):** Veriler tarayıcının geçici hafızasında değil, sunucu tarafında çalışan gerçek bir ilişkisel veritabanı dosyasında (`kutuphane.db`) güvenle saklanır. Python'ın yerleşik `sqlite3` ve `http.server` kütüphaneleri sayesinde **hiçbir ek paket kurulumu (`pip install` vb.) gerektirmez!**
