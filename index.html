@@ -24,12 +24,9 @@
       </div>
 
       <!-- View Switcher & Theme Toggle -->
+      <!-- View Switcher & Theme Toggle -->
       <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-        <!-- Icon-Only Theme Toggle Button -->
-        <button id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" title="Gece / Gündüz Modunu Değiştir" aria-label="Tema Değiştir">
-          <span id="theme-icon">☀️</span>
-        </button>
-
+        <div id="api-status-badge" class="status-badge available" style="padding: 6px 14px; font-size: 0.8rem;" title="Python SQLite veritabanı aktif"><span class="status-dot"></span> SQL Bağlı</div>
         <nav class="view-switcher" aria-label="Ekran Değiştirici">
           <button id="btn-student-view" class="switch-btn active" onclick="switchView('student')">
             <span>🎓</span> Öğrenci Vitrini
@@ -38,6 +35,9 @@
             <span>🔐</span> Admin Paneli
           </button>
         </nav>
+        <button class="theme-btn" onclick="toggleTheme()" title="Gece / Gündüz Modunu Değiştir" aria-label="Tema Değiştir">
+          <span id="theme-icon">☀️</span>
+        </button>
       </div>
     </header>
 

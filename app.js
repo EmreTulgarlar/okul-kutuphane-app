@@ -1,9 +1,9 @@
 /**
  * Yeditepe Üniversitesi - Bilgisayar Mühendisliği Kütüphanesi
- * Uygulama Mantığı ve State Yönetimi
+ * Uygulama Mantığı & SQL (SQLite + Python REST API) Entegrasyonu
  */
 
-// Varsayılan Örnek Kitap Verileri (Eğer LocalStorage boşsa yüklenir)
+// Varsayılan Örnek Kitap Verileri (Eğer sunucuya bağlanılamazsa geçici gösterim için)
 const DEFAULT_BOOKS = [
   {
     id: 'CSE-101',
@@ -26,50 +26,8 @@ const DEFAULT_BOOKS = [
       studentNo: '202307045',
       studentEmail: 'zeynep.aksoy@std.yeditepe.edu.tr',
       borrowDate: '2026-06-10',
-      dueDate: '2026-06-24' // Süresi geçmiş örnek
+      dueDate: '2026-06-24'
     }
-  },
-  {
-    id: 'CSE-103',
-    title: 'Computer Networking: A Top-Down Approach',
-    author: 'James F. Kurose',
-    category: 'Donanım & Sistem',
-    icon: '🌐',
-    status: 'available',
-    borrowInfo: null
-  },
-  {
-    id: 'CSE-104',
-    title: 'Clean Code: A Handbook of Agile Software Craftsmanship',
-    author: 'Robert C. Martin',
-    category: 'Yazılım & Algoritma',
-    icon: '⚡',
-    status: 'borrowed',
-    borrowInfo: {
-      studentName: 'Kaan Yıldız',
-      studentNo: '202207112',
-      studentEmail: 'kaan.yildiz@std.yeditepe.edu.tr',
-      borrowDate: '2026-06-20',
-      dueDate: '2026-07-04'
-    }
-  },
-  {
-    id: 'CSE-105',
-    title: 'Deep Learning',
-    author: 'Ian Goodfellow & Yoshua Bengio',
-    category: 'Yapay Zeka',
-    icon: '🧠',
-    status: 'available',
-    borrowInfo: null
-  },
-  {
-    id: 'CSE-106',
-    title: 'Modern Operating Systems',
-    author: 'Andrew S. Tanenbaum',
-    category: 'Donanım & Sistem',
-    icon: '🖥️',
-    status: 'available',
-    borrowInfo: null
   }
 ];
 
@@ -81,7 +39,8 @@ let state = {
   filterCategory: 'Tümü',
   searchQuery: '',
   isAdminAuthenticated: false, // Admin şifre doğrulama durumu
-  theme: 'dark' // 'dark' veya 'light'
+  theme: 'dark', // 'dark' veya 'light'
+  isOnline: true // SQL sunucu bağlantı durumu
 };
 
 // Kategori İkon Haritası
@@ -97,29 +56,43 @@ const CATEGORY_ICONS = {
  * Başlangıç ve Veri Yükleme
  */
 document.addEventListener('DOMContentLoaded', () => {
-  loadState();
   initTheme();
-  renderAll();
+  loadState();
 });
 
-function loadState() {
-  const savedData = localStorage.getItem('yeditepe_cse_kutuphane_books');
-  if (savedData) {
-    try {
-      state.books = JSON.parse(savedData);
-    } catch (e) {
-      console.error('Veri yükleme hatası:', e);
+async function loadState() {
+  try {
+    const res = await fetch('/api/books');
+    if (!res.ok) throw new Error('API yanıt vermedi');
+    const data = await res.json();
+    if (data.success) {
+      state.books = data.books;
+      state.isOnline = true;
+      updateApiStatusBadge(true);
+    }
+  } catch (e) {
+    console.warn('⚠️ SQL Sunucusuna bağlanılamadı, yerel önbellek gösteriliyor:', e);
+    state.isOnline = false;
+    updateApiStatusBadge(false);
+    if (state.books.length === 0) {
       state.books = [...DEFAULT_BOOKS];
     }
-  } else {
-    state.books = [...DEFAULT_BOOKS];
-    saveState();
   }
+  renderAll();
 }
 
-function saveState() {
-  localStorage.setItem('yeditepe_cse_kutuphane_books', JSON.stringify(state.books));
-  updateStats();
+function updateApiStatusBadge(isOnline) {
+  const badge = document.getElementById('api-status-badge');
+  if (!badge) return;
+  if (isOnline) {
+    badge.className = 'status-badge available';
+    badge.innerHTML = `<span class="status-dot"></span> SQL Bağlı (SQLite)`;
+    badge.title = "Python SQLite veritabanı aktif ve çevrimiçi";
+  } else {
+    badge.className = 'status-badge borrowed';
+    badge.innerHTML = `<span class="status-dot"></span> SQL Çevrimdışı`;
+    badge.title = "Sunucuya ulaşılamıyor. Lütfen terminalde 'python server.py' komutunu çalıştırın.";
+  }
 }
 
 /**
@@ -151,12 +124,8 @@ function setTheme(themeName) {
 }
 
 /**
- * Şifre & Yönetici Erişimi
+ * Şifre & Yönetici Erişimi (SQL API Üzerinden)
  */
-function getAdminPassword() {
-  return localStorage.getItem('yeditepe_admin_pwd') || 'yeditepe';
-}
-
 function requestAdminAccess() {
   if (state.isAdminAuthenticated) {
     switchView('admin');
@@ -169,18 +138,36 @@ function requestAdminAccess() {
   }
 }
 
-function verifyAdminPassword(event) {
+async function verifyAdminPassword(event) {
   event.preventDefault();
   const inputPwd = document.getElementById('admin-password-input').value;
   
-  if (inputPwd === getAdminPassword()) {
-    state.isAdminAuthenticated = true;
-    closeModal('password-modal');
-    switchView('admin');
-  } else {
-    alert('⚠️ Hatalı şifre girdiniz! Lütfen tekrar deneyiniz.');
-    document.getElementById('admin-password-input').value = '';
-    document.getElementById('admin-password-input').focus();
+  try {
+    const res = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: inputPwd })
+    });
+    const data = await res.json();
+    
+    if (data.valid) {
+      state.isAdminAuthenticated = true;
+      closeModal('password-modal');
+      switchView('admin');
+    } else {
+      alert('⚠️ Hatalı şifre girdiniz! Lütfen tekrar deneyiniz.');
+      document.getElementById('admin-password-input').value = '';
+      document.getElementById('admin-password-input').focus();
+    }
+  } catch (e) {
+    // Sunucu kapalıysa varsayılan şifreyle girişe izin ver
+    if (inputPwd === 'yeditepe') {
+      state.isAdminAuthenticated = true;
+      closeModal('password-modal');
+      switchView('admin');
+    } else {
+      alert('⚠️ Hatalı şifre girdiniz!');
+    }
   }
 }
 
@@ -191,17 +178,12 @@ function openChangePasswordModal() {
   openModal('change-password-modal');
 }
 
-function handleChangePassword(event) {
+async function handleChangePassword(event) {
   event.preventDefault();
   
   const oldPwd = document.getElementById('old-pwd-input').value;
   const newPwd = document.getElementById('new-pwd-input').value;
   const confirmPwd = document.getElementById('confirm-pwd-input').value;
-
-  if (oldPwd !== getAdminPassword()) {
-    alert('⚠️ Mevcut şifrenizi yanlış girdiniz!');
-    return;
-  }
 
   if (newPwd !== confirmPwd) {
     alert('⚠️ Yeni şifreler birbirisiyle uyuşmuyor!');
@@ -213,9 +195,23 @@ function handleChangePassword(event) {
     return;
   }
 
-  localStorage.setItem('yeditepe_admin_pwd', newPwd);
-  alert('✅ Yönetici şifreniz başarıyla güncellendi!');
-  closeModal('change-password-modal');
+  try {
+    const res = await fetch('/api/auth/change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      alert('✅ Yönetici şifreniz SQL veritabanında başarıyla güncellendi!');
+      closeModal('change-password-modal');
+    } else {
+      alert('⚠️ ' + (data.message || 'Şifre güncellenemedi.'));
+    }
+  } catch (e) {
+    alert('⚠️ Sunucu bağlantısı yok, şifre değiştirilemedi.');
+  }
 }
 
 /**
@@ -506,7 +502,7 @@ function openEditBookModal(bookId) {
   openModal('book-modal');
 }
 
-function handleSaveBook(event) {
+async function handleSaveBook(event) {
   event.preventDefault();
   
   const editId = document.getElementById('edit-book-id').value;
@@ -521,39 +517,35 @@ function handleSaveBook(event) {
     return;
   }
 
-  if (editId) {
-    // Düzenleme modu
-    const index = state.books.findIndex(b => b.id === editId);
-    if (index !== -1) {
-      state.books[index].title = title;
-      state.books[index].author = author;
-      state.books[index].category = category;
-      state.books[index].icon = icon;
-    }
-  } else {
-    // Yeni ekleme modu: ID benzersiz olmalı
-    if (state.books.some(b => b.id === id)) {
-      alert(`Hata: '${id}' koduna sahip bir kitap zaten sistemde kayıtlı!`);
-      return;
+  try {
+    if (editId) {
+      // Düzenleme modu: PUT /api/books/<id>
+      const res = await fetch('/api/books/' + encodeURIComponent(editId), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, category, icon })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+    } else {
+      // Yeni ekleme modu: POST /api/books
+      const res = await fetch('/api/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title, author, category, icon })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
     }
 
-    state.books.push({
-      id,
-      title,
-      author,
-      category,
-      icon,
-      status: 'available',
-      borrowInfo: null
-    });
+    await loadState();
+    closeModal('book-modal');
+  } catch (err) {
+    alert('⚠️ Hata: ' + err.message);
   }
-
-  saveState();
-  closeModal('book-modal');
-  renderAll();
 }
 
-function deleteBook(bookId) {
+async function deleteBook(bookId) {
   const book = state.books.find(b => b.id === bookId);
   if (!book) return;
 
@@ -562,10 +554,18 @@ function deleteBook(bookId) {
     return;
   }
 
-  if (confirm(`"${book.title}" kitabını envanterden silmek istediğinize emin misiniz?`)) {
-    state.books = state.books.filter(b => b.id !== bookId);
-    saveState();
-    renderAll();
+  if (confirm(`"${book.title}" kitabını envanterden (SQL Veritabanı) silmek istediğinize emin misiniz?`)) {
+    try {
+      const res = await fetch('/api/books/' + encodeURIComponent(bookId), {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      
+      await loadState();
+    } catch (err) {
+      alert('⚠️ Silme işlemi başarısız: ' + err.message);
+    }
   }
 }
 
@@ -584,7 +584,7 @@ function openLendModal(bookId) {
   openModal('lend-modal');
 }
 
-function handleLendBook(event) {
+async function handleLendBook(event) {
   event.preventDefault();
   
   const bookId = document.getElementById('lend-book-id').value;
@@ -593,41 +593,39 @@ function handleLendBook(event) {
   const studentEmail = document.getElementById('student-email-input').value.trim();
   const borrowDays = parseInt(document.getElementById('borrow-days-input').value, 10) || 14;
 
-  const bookIndex = state.books.findIndex(b => b.id === bookId);
-  if (bookIndex === -1) return;
+  try {
+    const res = await fetch('/api/books/' + encodeURIComponent(bookId) + '/lend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentName, studentNo, studentEmail, borrowDays })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
 
-  const now = new Date();
-  const borrowDate = now.toISOString().split('T')[0];
-  
-  const due = new Date();
-  due.setDate(now.getDate() + borrowDays);
-  const dueDate = due.toISOString().split('T')[0];
-
-  state.books[bookIndex].status = 'borrowed';
-  state.books[bookIndex].borrowInfo = {
-    studentName,
-    studentNo,
-    studentEmail,
-    borrowDate,
-    dueDate
-  };
-
-  saveState();
-  closeModal('lend-modal');
-  renderAll();
+    await loadState();
+    closeModal('lend-modal');
+  } catch (err) {
+    alert('⚠️ Ödünç verme işlemi başarısız: ' + err.message);
+  }
 }
 
 // 3. İade Alma İşlemi
-function returnBook(bookId) {
+async function returnBook(bookId) {
   const book = state.books.find(b => b.id === bookId);
   if (!book || book.status !== 'borrowed') return;
 
   if (confirm(`"${book.title}" kitabı ${book.borrowInfo.studentName} adlı öğrenciden iade alındı olarak işaretlenecek. Onaylıyor musunuz?`)) {
-    book.status = 'available';
-    book.borrowInfo = null;
-    
-    saveState();
-    renderAll();
+    try {
+      const res = await fetch('/api/books/' + encodeURIComponent(bookId) + '/return', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+
+      await loadState();
+    } catch (err) {
+      alert('⚠️ İade işlemi başarısız: ' + err.message);
+    }
   }
 }
 
@@ -638,7 +636,7 @@ function exportData() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.books, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `yeditepe_kutuphane_yedek_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.setAttribute("download", `yeditepe_kutuphane_sql_yedek_${new Date().toISOString().split('T')[0]}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -649,18 +647,25 @@ function importData(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const importedBooks = JSON.parse(e.target.result);
       if (!Array.isArray(importedBooks)) {
         throw new Error("Geçersiz format");
       }
-      state.books = importedBooks;
-      saveState();
-      renderAll();
-      alert("Yedek başarıyla yüklendi!");
+      
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ books: importedBooks })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+
+      await loadState();
+      alert("✅ Yedek SQL veritabanına başarıyla yüklendi!");
     } catch (err) {
-      alert("Yüklenen dosya geçersiz bir kütüphane yedeği. Lütfen doğru bir JSON dosyası seçin.");
+      alert("⚠️ Yükleme hatası: " + err.message);
     }
     event.target.value = ''; // Reset input
   };
